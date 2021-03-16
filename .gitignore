@@ -1,0 +1,6 @@
+/venv/
+/downloaded/
+/dist/
+/build/
+/spam.log
+/.idea/
