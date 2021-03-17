@@ -23,18 +23,41 @@ def get_links(name, window_env):
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--headless")
         driver = webdriver.Chrome('chromedriver.exe', chrome_options=chrome_options)
+        table_data_tmp = []
         driver.get(name)
         element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.playlist-scoll-wrapper"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#nav-image"))
         )
-        content = driver.find_element_by_css_selector('div.playlist-scoll-wrapper')
-        links = content.find_elements_by_tag_name('a')
-        table_data_tmp = []
-        for link in links:
-            title = link.find_element_by_css_selector('div.col-xs-8.col-sm-8.col-md-8 > h4').text
-            link = link.get_attribute('href')
-            if link and 'http' in link:
-                table_data_tmp.append([title, link, 'ready for download'])
+
+        try:
+            content = driver.find_element_by_css_selector('div.playlist-scoll-wrapper')
+            links = content.find_elements_by_tag_name('a')
+
+            try:
+                for link in links:
+                    title = link.find_element_by_css_selector('h4').text
+                    link = link.get_attribute('href')
+                    if link and 'http' in link:
+                        table_data_tmp.append([title, link, 'ready for download'])
+            except Exception as ex:
+                print(ex)
+        except Exception as ex:
+            print(ex)
+
+        try:
+            content_2 = driver.find_element_by_css_selector('div.intro-right')
+            links = content_2.find_elements_by_tag_name('a')
+            for link in links:
+                try:
+                    href = link.get_attribute('href')
+                    title = link.find_element_by_tag_name('h4')
+                    if href and 'http' in href:
+                        table_data_tmp.append([title.text, href, 'ready for download'])
+                except Exception as ex:
+                    print(ex)
+        except Exception as ex:
+            print(ex)
+
         window_env.write_event_value('GetLinksSuccessfully', json.dumps(table_data_tmp))  # put a message into queue for GUI
         driver.quit()
     except Exception as ex:
@@ -50,7 +73,7 @@ def start_download(links, window_env):
         for link_idx, link in enumerate(links):
             link_title = link[0]
             input_link = link[1]
-            process = subprocess.Popen(['youtube-dl.exe', input_link, '-o', f'downloaded/{link_title}.mp4'],
+            process = subprocess.Popen(['./youtube-dl.exe', input_link, '-o', f'downloaded/{link_title}.mp4'],
                                        stdout=subprocess.PIPE)
             last_text = ''
             emit_downloading = False
