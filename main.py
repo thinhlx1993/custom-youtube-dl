@@ -49,11 +49,8 @@ while True:
             window.Element('Remove').Update(disabled=True)
             window.Element('Get Playlist').Update(disabled=True)
             table_data = window.Element('table').Get()
-            for idx, ep in enumerate(table_data[:4]):
-                href = ep[1]
-                title = ep[0]
-                x = threading.Thread(target=start_download, args=(idx, title, href, window,), daemon=True)
-                x.start()
+            x = threading.Thread(target=start_download, args=(table_data, window,), daemon=True)
+            x.start()
         except Exception as ex:
             print(ex)
     elif event == 'UploadStatusDownload':
@@ -69,17 +66,6 @@ while True:
                 window.Element('download_btn').Update(disabled=False, text='Start download')
                 window.Element('Remove').Update(disabled=False)
                 window.Element('Get Playlist').Update(disabled=False)
-
-            if len(result) < 4:
-                table_data = window.Element('table').Get()
-                for idx, ep in enumerate(table_data):
-                    href = ep[1]
-                    title = ep[0]
-                    status = ep[2]
-                    if status == 'ready for download':
-                        x = threading.Thread(target=start_download, args=(idx, title, href, window,), daemon=True)
-                        x.start()
-                        break
 
         except Exception as ex:
             print(ex)

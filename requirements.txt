@@ -3,3 +3,4 @@ requests
 selenium==3.141.0
 youtube-dl
 pyinstaller
+PySimpleGUI

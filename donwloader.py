@@ -44,41 +44,43 @@ def get_links(name, window_env):
         print(f'get_links exception: {ex}')
 
 
-def start_download(link_idx, link_title, input_link, window_env):
-    # print(f'start download: {input_link}')
+def start_download(links, window_env):
     try:
         os.makedirs('downloaded', exist_ok=True)
-        process = subprocess.Popen(['youtube-dl', input_link, '-o', f'downloaded/{link_title}.mp4'],
-                                   stdout=subprocess.PIPE)
-        last_text = ''
-        emit_downloading = False
-        while True:
-            output = process.stdout.readline().decode("utf-8")
-        
-            if output == '' and process.poll() is not None:
-                # logger.info(f"break {link_title}, {output.strip()}")
-                break
-            if output:
-                if not emit_downloading:
-                    window_env.write_event_value('UploadStatusDownload',
-                                                 [link_idx, 'Downloading'])  # put a message into queue for GUI
-                    emit_downloading = True
-                last_text = output.strip()
-        rc = process.poll()
-        status = 'Downloaded'
+        for link_idx, link in enumerate(links):
+            link_title = link[0]
+            input_link = link[1]
+            process = subprocess.Popen(['youtube-dl.exe', input_link, '-o', f'downloaded/{link_title}.mp4'],
+                                       stdout=subprocess.PIPE)
+            last_text = ''
+            emit_downloading = False
+            while True:
+                output = process.stdout.readline().decode("utf-8")
 
-        for file in os.listdir('downloaded'):
-            if link_title in file and 'part' in file:
-                status = 'Downloading errors, network aborted'
+                if output == '' and process.poll() is not None:
+                    # logger.info(f"break {link_title}, {output.strip()}")
+                    break
+                if output:
+                    if not emit_downloading:
+                        window_env.write_event_value('UploadStatusDownload',
+                                                     [link_idx, 'Downloading'])  # put a message into queue for GUI
+                        emit_downloading = True
+                    last_text = output.strip()
+            rc = process.poll()
+            status = 'Downloaded'
 
-        if f'{link_title}.mp4' not in os.listdir('downloaded'):
-            status = 'Video not found errors'
+            for file in os.listdir('downloaded'):
+                if link_title in file and 'part' in file:
+                    status = 'Downloading errors, network aborted'
 
-        if 'Extracting information' in last_text:
-            status = 'Can not download'
-        # logger.info(f'Download end: {rc}')
-        # logging.info(f'Download end: {rc}')
-        window_env.write_event_value('UploadStatusDownload', [link_idx, status])  # put a message into queue for GUI
+            if f'{link_title}.mp4' not in os.listdir('downloaded'):
+                status = 'Video not found errors'
+
+            if 'Extracting information' in last_text:
+                status = 'Can not download'
+            # logger.info(f'Download end: {rc}')
+            # logging.info(f'Download end: {rc}')
+            window_env.write_event_value('UploadStatusDownload', [link_idx, status])  # put a message into queue for GUI
     except Exception as ex:
         print(ex)
         # logger.error(f'start_download exception: {ex}')
