@@ -6,14 +6,52 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-# logger = logging.getLogger('spam_application')
-# logger.setLevel(logging.DEBUG)
-# fh = logging.FileHandler('spam.log')
-# fh.setLevel(logging.DEBUG)
-#
-# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# fh.setFormatter(formatter)
-# logger.addHandler(fh)
+import youtube_dl
+
+logger = logging.getLogger('spam_application')
+logger.setLevel(logging.DEBUG)
+fh = logging.FileHandler('spam.log')
+fh.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+logger.addHandler(fh)
+windows = None
+
+
+class MyLogger(object):
+    def debug(self, msg):
+        # logger.debug(msg)
+        pass
+
+    def warning(self, msg):
+        # logger.warning(msg)
+        pass
+
+    def error(self, msg):
+        # global windows
+        # if windows is not None:
+            # windows.write_event_value('UploadStatusDownload',
+            #                              [d['filename'], d['status']])  # put a message into queue for GUI
+        logger.error(msg)
+
+
+def my_hook(d):
+    if d['status'] == 'finished':
+        if windows is not None:
+            windows.write_event_value('UploadStatusDownload',
+                                         [d['filename'], d['status']])  # put a message into queue for GUI
+        print('Done downloading, now converting ...')
+    if d['status'] == 'error':
+        if windows is not None:
+            windows.write_event_value('UploadStatusDownload',
+                                         [d['filename'], d['status']])  # put a message into queue for GUI
+        print('downloading errors')
+    if d['status'] == 'downloading':
+        if windows is not None:
+            windows.write_event_value('UploadStatusDownload',
+                                         [d['filename'], f"{d['status']} {round(d['downloaded_bytes']/d['total_bytes'], 1)}%"])  # put a message into queue for GUI
+    # print(d['filename'], d['status'])
 
 
 def get_links(name, window_env):
@@ -67,43 +105,70 @@ def get_links(name, window_env):
         print(f'get_links exception: {ex}')
 
 
-def start_download(links, window_env):
+def start_download(link, link_idx, window_env):
     try:
+
+        global windows
+        if windows is None:
+            windows = window_env
+
         os.makedirs('downloaded', exist_ok=True)
-        for link_idx, link in enumerate(links):
-            link_title = link[0]
-            input_link = link[1]
-            process = subprocess.Popen(['./youtube-dl.exe', input_link, '-o', f'downloaded/{link_title}.mp4'],
-                                       stdout=subprocess.PIPE)
-            last_text = ''
-            emit_downloading = False
-            while True:
-                output = process.stdout.readline().decode("utf-8")
+        link_title = link[0]
+        input_link = link[1]
 
-                if output == '' and process.poll() is not None:
-                    # logger.info(f"break {link_title}, {output.strip()}")
-                    break
-                if output:
-                    if not emit_downloading:
-                        window_env.write_event_value('UploadStatusDownload',
-                                                     [link_idx, 'Downloading'])  # put a message into queue for GUI
-                        emit_downloading = True
-                    last_text = output.strip()
-            rc = process.poll()
-            status = 'Downloaded'
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'logger': MyLogger(),
+            'progress_hooks': [my_hook],
+            'outtmpl': f'downloaded/{link_title}.mp4'
+        }
 
-            for file in os.listdir('downloaded'):
-                if link_title in file and 'part' in file:
-                    status = 'Downloading errors, network aborted'
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            try:
+                meta = ydl.extract_info(
+                    input_link, download=False)
+                if meta and 'entries' in meta.keys():
+                    ydl.download([input_link])
+            except Exception as ex:
+                logger.error('can not get video info')
+                windows.write_event_value('UploadStatusDownload',
+                                          [link_title, 'can not get video info'])  # put a message into queue for GUI
+                print(f'extract errors {ex}')
 
-            if f'{link_title}.mp4' not in os.listdir('downloaded'):
-                status = 'Video not found errors'
-
-            if 'Extracting information' in last_text:
-                status = 'Can not download'
-            # logger.info(f'Download end: {rc}')
-            # logging.info(f'Download end: {rc}')
-            window_env.write_event_value('UploadStatusDownload', [link_idx, status])  # put a message into queue for GUI
+        # last_text = ''
+        # emit_downloading = False
+        # while True:
+        #     output = process.stdout.readline().decode("utf-8")
+        #
+        #     if output == '' and process.poll() is not None:
+        #         # logger.info(f"break {link_title}, {output.strip()}")
+        #         break
+        #     if output:
+        #         if not emit_downloading:
+        #             window_env.write_event_value('UploadStatusDownload',
+        #                                          [link_idx, 'Downloading'])  # put a message into queue for GUI
+        #             emit_downloading = True
+        #         last_text = output.strip()
+        # rc = process.poll()
+        # status = 'Downloaded'
+        #
+        # for file in os.listdir('downloaded'):
+        #     if link_title in file and 'part' in file:
+        #         status = 'Downloading errors, network aborted'
+        #
+        # if f'{link_title}.mp4' not in os.listdir('downloaded'):
+        #     status = 'Video not found errors'
+        #
+        # if 'Extracting information' in last_text:
+        #     status = 'Can not download'
+        # logger.info(f'Download end: {rc}')
+        # logging.info(f'Download end: {rc}')
+        # window_env.write_event_value('UploadStatusDownload', [link_idx, status])  # put a message into queue for GUI
     except Exception as ex:
         print(ex)
         # logger.error(f'start_download exception: {ex}')
