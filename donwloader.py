@@ -50,7 +50,7 @@ def my_hook(d):
     if d['status'] == 'downloading':
         if windows is not None:
             windows.write_event_value('UploadStatusDownload',
-                                         [d['filename'], f"{d['status']} {round(d['downloaded_bytes']/d['total_bytes'], 1)}%"])  # put a message into queue for GUI
+                                         [d['filename'], f"{d['status']} {round(d['downloaded_bytes']/d['total_bytes'], 1)}% {round(d['speed'], 2)}Kb/s"])  # put a message into queue for GUI
     # print(d['filename'], d['status'])
 
 
@@ -117,12 +117,6 @@ def start_download(link, link_idx, window_env):
         input_link = link[1]
 
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
             'logger': MyLogger(),
             'progress_hooks': [my_hook],
             'outtmpl': f'downloaded/{link_title}.mp4'
