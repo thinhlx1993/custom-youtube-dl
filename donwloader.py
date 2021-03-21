@@ -49,9 +49,9 @@ def my_hook(d):
         print('downloading errors')
     if d['status'] == 'downloading':
         if windows is not None:
-            speed = int(d['speed']/1024) if d['speed'] is not None else 0
+            speed = round(d['speed']/1024/1024, 1) if d['speed'] is not None else 0
             windows.write_event_value('UploadStatusDownload',
-                                         [d['filename'], f"{d['status']} {round(d['downloaded_bytes']/d['total_bytes'], 1)}% {speed}Kb/s"])  # put a message into queue for GUI
+                                         [d['filename'], f"{d['status']} {round(d['downloaded_bytes']/d['total_bytes']*100, 1)}% {speed}Mb/s"])  # put a message into queue for GUI
     # print(d['filename'], d['status'])
 
 
