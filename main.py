@@ -34,6 +34,7 @@ while True:
         break
     elif event == 'Get Playlist':
         window.Element('Get Playlist').Update(disabled=True, text='Getting Playlist...')
+        processed = 0
         window.Element('table').Update(values=[])
         x = threading.Thread(target=get_links, args=(values['input'], window,), daemon=True)
         x.start()
