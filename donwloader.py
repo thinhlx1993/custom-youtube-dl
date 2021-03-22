@@ -100,6 +100,19 @@ def get_links(name, window_env):
         except Exception as ex:
             print(ex)
 
+        ydl_opts = {}
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            for idx, data in enumerate(table_data_tmp):
+                title, link, status = data
+                try:
+                    meta = ydl.extract_info(link, download=False)
+                except:
+                    driver.get(link)
+                    iframe = driver.find_element_by_css_selector('#iframe')
+                    if iframe:
+                        link = iframe.get_attribute('src')
+                        table_data_tmp[idx] = [title, link, status]
+
         window_env.write_event_value('GetLinksSuccessfully', json.dumps(table_data_tmp))  # put a message into queue for GUI
         driver.quit()
     except Exception as ex:
@@ -133,55 +146,21 @@ def start_download(link, link_idx, window_env):
                 if meta and 'entries' in meta.keys():
                     ydl.download([input_link])
             except Exception as ex:
-                if not os.path.isfile(f'downloaded/{link_title}.mp4'):
-                    r = requests.get(input_link, stream=True, headers={
-                        'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36'})
-                    if r.status_code == 200:
-                        windows.write_event_value('UploadStatusDownload',
-                                                  [link_title, 'downloading'])  # put a message into queue for GUI
-                        with open(f'downloaded/{link_title}.mp4', 'wb') as f:
-                            r.raw.decode_content = True
-                            shutil.copyfileobj(r.raw, f)
-
-                        windows.write_event_value('UploadStatusDownload',
-                                                  [link_title, 'finished'])  # put a message into queue for GUI
-                    else:
-                        logger.error('can not get video info')
-                        windows.write_event_value('UploadStatusDownload',
-                                                  [link_title, 'can not get video info'])  # put a message into queue for GUI
-                        print(f'extract errors {ex}')
-                else:
+                r = requests.get(input_link, stream=True, headers={'User-agent': 'Mozilla/5.0'})
+                if r.status_code == 200:
+                    windows.write_event_value('UploadStatusDownload',
+                                              [link_title, 'downloading'])  # put a message into queue for GUI
+                    file_name = link_title.replace('/', '')
+                    with open(f'downloaded/{file_name}.mp4', 'wb') as f:
+                        r.raw.decode_content = True
+                        shutil.copyfileobj(r.raw, f)
                     windows.write_event_value('UploadStatusDownload',
                                               [link_title, 'finished'])  # put a message into queue for GUI
-        # last_text = ''
-        # emit_downloading = False
-        # while True:
-        #     output = process.stdout.readline().decode("utf-8")
-        #
-        #     if output == '' and process.poll() is not None:
-        #         # logger.info(f"break {link_title}, {output.strip()}")
-        #         break
-        #     if output:
-        #         if not emit_downloading:
-        #             window_env.write_event_value('UploadStatusDownload',
-        #                                          [link_idx, 'Downloading'])  # put a message into queue for GUI
-        #             emit_downloading = True
-        #         last_text = output.strip()
-        # rc = process.poll()
-        # status = 'Downloaded'
-        #
-        # for file in os.listdir('downloaded'):
-        #     if link_title in file and 'part' in file:
-        #         status = 'Downloading errors, network aborted'
-        #
-        # if f'{link_title}.mp4' not in os.listdir('downloaded'):
-        #     status = 'Video not found errors'
-        #
-        # if 'Extracting information' in last_text:
-        #     status = 'Can not download'
-        # logger.info(f'Download end: {rc}')
-        # logging.info(f'Download end: {rc}')
-        # window_env.write_event_value('UploadStatusDownload', [link_idx, status])  # put a message into queue for GUI
+                else:
+                    logger.error('can not get video info')
+                    windows.write_event_value('UploadStatusDownload',
+                                              [link_title, 'can not get video info'])  # put a message into queue for GUI
+                    print(f'extract errors {ex}')
     except Exception as ex:
         print(ex)
         # logger.error(f'start_download exception: {ex}')
