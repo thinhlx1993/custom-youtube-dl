@@ -109,8 +109,8 @@ def get_links(name, window_env):
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     meta = ydl.extract_info(link, download=False)
             except:
-                driver.get(link)
                 try:
+                    driver.get(link)
                     iframe = driver.find_element_by_css_selector('#iframe')
                     if iframe:
                         link = iframe.get_attribute('src')
