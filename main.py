@@ -11,7 +11,9 @@ processed = 0
 sg.theme('DarkAmber')  # Add a touch of color
 # All the stuff inside your window.
 headings = ['title', 'link film', 'download status']  # the text of the headings
-layout = [[sg.Text('Enter playlist link here'), sg.InputText(default_text="https://www.laughseejapan.com/watch?v=19368&list=193", key='input', size=(90, 20)),
+# https://www.laughseejapan.com/playlist?list=1541
+# https://www.laughseejapan.com/watch?v=19368&list=193
+layout = [[sg.Text('Enter playlist link here'), sg.InputText(default_text="https://www.laughseejapan.com/playlist?list=1541", key='input', size=(90, 20)),
            sg.Text('Threads'), sg.InputText(key='input_thread', default_text='5',  size=(15, 20))],
           [sg.Table(values=[],
                     headings=headings,

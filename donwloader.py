@@ -1,12 +1,15 @@
-import json
 import os
-import subprocess
+import json
+import requests
+import shutil
 import logging
+import youtube_dl
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import youtube_dl
+
 
 logger = logging.getLogger('spam_application')
 logger.setLevel(logging.DEBUG)
@@ -130,11 +133,26 @@ def start_download(link, link_idx, window_env):
                 if meta and 'entries' in meta.keys():
                     ydl.download([input_link])
             except Exception as ex:
-                logger.error('can not get video info')
-                windows.write_event_value('UploadStatusDownload',
-                                          [link_title, 'can not get video info'])  # put a message into queue for GUI
-                print(f'extract errors {ex}')
+                if not os.path.isfile(f'downloaded/{link_title}.mp4'):
+                    r = requests.get(input_link, stream=True, headers={
+                        'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36'})
+                    if r.status_code == 200:
+                        windows.write_event_value('UploadStatusDownload',
+                                                  [link_title, 'downloading'])  # put a message into queue for GUI
+                        with open(f'downloaded/{link_title}.mp4', 'wb') as f:
+                            r.raw.decode_content = True
+                            shutil.copyfileobj(r.raw, f)
 
+                        windows.write_event_value('UploadStatusDownload',
+                                                  [link_title, 'finished'])  # put a message into queue for GUI
+                    else:
+                        logger.error('can not get video info')
+                        windows.write_event_value('UploadStatusDownload',
+                                                  [link_title, 'can not get video info'])  # put a message into queue for GUI
+                        print(f'extract errors {ex}')
+                else:
+                    windows.write_event_value('UploadStatusDownload',
+                                              [link_title, 'finished'])  # put a message into queue for GUI
         # last_text = ''
         # emit_downloading = False
         # while True:
