@@ -102,18 +102,21 @@ def get_links(name, window_env):
         except Exception as ex:
             print(ex)
 
-        ydl_opts = {}
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            for idx, data in enumerate(table_data_tmp):
-                title, link, status = data
-                try:
+        for idx, data in enumerate(table_data_tmp):
+            title, link, status = data
+            try:
+                ydl_opts = {}
+                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     meta = ydl.extract_info(link, download=False)
-                except:
-                    driver.get(link)
+            except:
+                driver.get(link)
+                try:
                     iframe = driver.find_element_by_css_selector('#iframe')
                     if iframe:
                         link = iframe.get_attribute('src')
                         table_data_tmp[idx] = [title, link, status]
+                except Exception as ex:
+                    print(ex)
 
         window_env.write_event_value('GetLinksSuccessfully', json.dumps(table_data_tmp))  # put a message into queue for GUI
         driver.quit()

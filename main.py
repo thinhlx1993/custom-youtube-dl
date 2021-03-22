@@ -31,7 +31,7 @@ window = sg.Window('laughseejapan downloader', layout, size=(1000, 450))
 # Event Loop to process "events" and get the "values" of the inputs
 while True:
     event, values = window.read()
-    print(event, values)
+    # print(event, values)
     if event == sg.WIN_CLOSED or event == 'Cancel':  # if user closes window or clicks cancel
         break
     elif event == 'Get Playlist':
