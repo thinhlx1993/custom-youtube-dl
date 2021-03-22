@@ -63,7 +63,7 @@ def get_links(name, window_env):
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--incognito")
         chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--headless")
+        # chrome_options.add_argument("--headless")
         driver = webdriver.Chrome('chromedriver.exe', chrome_options=chrome_options)
         table_data_tmp = []
         driver.get(name)
