@@ -78,6 +78,7 @@ def get_links(name, window_env):
             try:
                 for link in links:
                     title = link.find_element_by_css_selector('h4').text
+                    title = title.replace('/', '')
                     link = link.get_attribute('href')
                     if link and 'http' in link:
                         table_data_tmp.append([title, link, 'ready for download'])
@@ -92,9 +93,10 @@ def get_links(name, window_env):
             for link in links:
                 try:
                     href = link.get_attribute('href')
-                    title = link.find_element_by_tag_name('h4')
+                    title = link.find_element_by_tag_name('h4').text
+                    title = title.replace('/', '')
                     if href and 'http' in href:
-                        table_data_tmp.append([title.text, href, 'ready for download'])
+                        table_data_tmp.append([title, href, 'ready for download'])
                 except Exception as ex:
                     print(ex)
         except Exception as ex:
@@ -143,15 +145,14 @@ def start_download(link, link_idx, window_env):
             try:
                 meta = ydl.extract_info(
                     input_link, download=False)
-                if meta and 'entries' in meta.keys():
+                if meta:
                     ydl.download([input_link])
             except Exception as ex:
                 r = requests.get(input_link, stream=True, headers={'User-agent': 'Mozilla/5.0'})
                 if r.status_code == 200:
                     windows.write_event_value('UploadStatusDownload',
                                               [link_title, 'downloading'])  # put a message into queue for GUI
-                    file_name = link_title.replace('/', '')
-                    with open(f'downloaded/{file_name}.mp4', 'wb') as f:
+                    with open(f'downloaded/{link_title}.mp4', 'wb') as f:
                         r.raw.decode_content = True
                         shutil.copyfileobj(r.raw, f)
                     windows.write_event_value('UploadStatusDownload',
