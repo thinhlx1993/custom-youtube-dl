@@ -1,6 +1,6 @@
-beautifulsoup4==4.9.3
-requests
-selenium==3.141.0
 youtube-dl
 pyinstaller
 PySimpleGUI
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib

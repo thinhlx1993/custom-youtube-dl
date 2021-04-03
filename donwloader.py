@@ -1,15 +1,13 @@
 import os
 import json
-import requests
-import shutil
 import logging
+import threading
+
 import youtube_dl
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
+import time
+# from window_file import window
+import googleapiclient.discovery
+from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger('spam_application')
 logger.setLevel(logging.DEBUG)
@@ -19,7 +17,6 @@ fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
-windows = None
 
 
 class MyLogger(object):
@@ -34,137 +31,95 @@ class MyLogger(object):
     def error(self, msg):
         # global windows
         # if windows is not None:
-            # windows.write_event_value('UploadStatusDownload',
-            #                              [d['filename'], d['status']])  # put a message into queue for GUI
+        # windows.write_event_value('UploadStatusDownload',
+        #                              [d['filename'], d['status']])  # put a message into queue for GUI
         logger.error(msg)
 
 
-def my_hook(d):
-    if d['status'] == 'finished':
-        if windows is not None:
-            windows.write_event_value('UploadStatusDownload',
-                                         [d['filename'], d['status']])  # put a message into queue for GUI
-        print('Done downloading, now converting ...')
-    if d['status'] == 'error':
-        if windows is not None:
-            windows.write_event_value('UploadStatusDownload',
-                                         [d['filename'], d['status']])  # put a message into queue for GUI
-        print('downloading errors')
-    if d['status'] == 'downloading':
-        if windows is not None:
-            speed = round(d['speed']/1024/1024, 1) if d['speed'] is not None else 0
-            windows.write_event_value('UploadStatusDownload',
-                                         [d['filename'], f"{d['status']} {round(d['downloaded_bytes']/d['total_bytes']*100, 1)}% {speed}Mb/s"])  # put a message into queue for GUI
-    # print(d['filename'], d['status'])
-
-
-def get_links(name, window_env):
+def get_links(url, window_env):
     try:
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--incognito")
-        chrome_options.add_argument("--start-maximized")
-        # chrome_options.add_argument("--headless")
-        driver = webdriver.Chrome('chromedriver.exe', chrome_options=chrome_options)
-        table_data_tmp = []
-        driver.get(name)
-        element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "#nav-image"))
+        # extract playlist id from url
+        # url = 'https://www.youtube.com/playlist?list=PL3D7BFF1DDBDAAFE5'
+        query = parse_qs(urlparse(url).query, keep_blank_values=True)
+        playlist_id = query["list"][0]
+
+        print(f'get all playlist items links from {playlist_id}')
+        youtube = googleapiclient.discovery.build("youtube", "v3",
+                                                  developerKey="AIzaSyBDHutkFzJwEiSLkjy_7cMCgdWdZjaBobI")
+
+        request = youtube.playlistItems().list(
+            part="snippet",
+            playlistId=playlist_id,
+            maxResults=50
         )
+        response = request.execute()
 
-        try:
-            content = driver.find_element_by_css_selector('div.playlist-scoll-wrapper')
-            links = content.find_elements_by_tag_name('a')
+        playlist_items = []
+        while request is not None:
+            response = request.execute()
+            playlist_items += response["items"]
+            request = youtube.playlistItems().list_next(request, response)
 
-            try:
-                for link in links:
-                    title = link.find_element_by_css_selector('h4').text
-                    title = title.replace('/', '')
-                    link = link.get_attribute('href')
-                    if link and 'http' in link:
-                        table_data_tmp.append([title, link, 'ready for download'])
-            except Exception as ex:
-                print(ex)
-        except Exception as ex:
-            print(ex)
+        print(f"total: {len(playlist_items)}")
+        table_data_tmp = [(t["snippet"]["title"],
+                           f'https://www.youtube.com/watch?v={t["snippet"]["resourceId"]["videoId"]}',
+                           'ready for download') for t in playlist_items]
 
-        try:
-            content_2 = driver.find_element_by_css_selector('div.intro-right')
-            links = content_2.find_elements_by_tag_name('a')
-            for link in links:
-                try:
-                    href = link.get_attribute('href')
-                    title = link.find_element_by_tag_name('h4').text
-                    title = title.replace('/', '')
-                    if href and 'http' in href:
-                        table_data_tmp.append([title, href, 'ready for download'])
-                except Exception as ex:
-                    print(ex)
-        except Exception as ex:
-            print(ex)
-
-        for idx, data in enumerate(table_data_tmp):
-            title, link, status = data
-            try:
-                ydl_opts = {}
-                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    meta = ydl.extract_info(link, download=False)
-            except:
-                try:
-                    driver.get(link)
-                    iframe = driver.find_element_by_css_selector('#iframe')
-                    if iframe:
-                        link = iframe.get_attribute('src')
-                        table_data_tmp[idx] = [title, link, status]
-                except Exception as ex:
-                    print(ex)
-
-        window_env.write_event_value('GetLinksSuccessfully', json.dumps(table_data_tmp))  # put a message into queue for GUI
-        driver.quit()
+        window_env.write_event_value('GetLinksSuccessfully',
+                                     json.dumps(table_data_tmp))  # put a message into queue for GUI
     except Exception as ex:
-        if driver:
-            driver.quit()
-        # logger.error(f'get_links exception: {ex}')
         print(f'get_links exception: {ex}')
 
 
-def start_download(link, link_idx, window_env):
-    try:
+class DownloadingThread(threading.Thread):
+    def __init__(self, threadID, video, window):
+        threading.Thread.__init__(self, daemon=True)
+        self.threadID = threadID
+        self.video = video
+        self.window = window
 
-        global windows
-        if windows is None:
-            windows = window_env
-
+    def run(self):
         os.makedirs('downloaded', exist_ok=True)
-        link_title = link[0]
-        input_link = link[1]
+        link_title = self.video[0]
+        input_link = self.video[1]
 
         ydl_opts = {
-            'logger': MyLogger(),
-            'progress_hooks': [my_hook],
+            'format': 'bestvideo+bestaudio/best',
+            # 'logger': MyLogger(),
+            # 'progress_hooks': [self.my_hook],
             'outtmpl': f'downloaded/{link_title}.mp4'
         }
 
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            try:
-                meta = ydl.extract_info(
-                    input_link, download=False)
-                if meta:
-                    ydl.download([input_link])
-            except Exception as ex:
-                r = requests.get(input_link, stream=True, headers={'User-agent': 'Mozilla/5.0'})
-                if r.status_code == 200:
-                    windows.write_event_value('UploadStatusDownload',
-                                              [link_title, 'downloading'])  # put a message into queue for GUI
-                    with open(f'downloaded/{link_title}.mp4', 'wb') as f:
-                        r.raw.decode_content = True
-                        shutil.copyfileobj(r.raw, f)
-                    windows.write_event_value('UploadStatusDownload',
-                                              [link_title, 'finished'])  # put a message into queue for GUI
-                else:
-                    logger.error('can not get video info')
-                    windows.write_event_value('UploadStatusDownload',
-                                              [link_title, 'can not get video info'])  # put a message into queue for GUI
-                    print(f'extract errors {ex}')
-    except Exception as ex:
-        print(ex)
-        # logger.error(f'start_download exception: {ex}')
+        try:
+            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([input_link])
+        except:
+            pass
+
+        try:
+            self.window.write_event_value('-THREAD-',
+                                          json.dumps(
+                                              [self.threadID, 'finished']))  # put a message into queue for GUI
+        except:
+            pass
+
+    # @staticmethod
+    # def my_hook(d):
+    #     try:
+    #         filename = d['filename'].replace('downloaded\\', '')
+    #         link_idx = int(filename.rsplit('-')[0])
+    #         # self.window.write_event_value('UploadStatusDownload', '** DONE **')  # put a message into queue for GUI
+    #         if d['status'] == 'finished':
+    #             window.write_event_value('-THREAD-',
+    #                                      json.dumps([link_idx, d['status']]))  # put a message into queue for GUI
+    #             print('Done downloading, now converting ...')
+    #         if d['status'] == 'error':
+    #             window.write_event_value('-THREAD-',
+    #                                      json.dumps([link_idx, d['status']]))  # put a message into queue for GUI
+    #             print('downloading errors')
+    #         if d['status'] == 'downloading':
+    #             speed = round(d['speed'] / 1024 / 1024, 1) if d['speed'] is not None else 0
+    #             download_info = f"{d['status']} {round(d['downloaded_bytes'] / d['total_bytes'] * 100, 1)}% {speed}Mb/s"
+    #
+    #     except:
+    #         pass
