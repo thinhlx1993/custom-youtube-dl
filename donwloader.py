@@ -4,9 +4,7 @@ import logging
 import threading
 
 import youtube_dl
-import time
-# from window_file import window
-import googleapiclient.discovery
+from googleapiclient import discovery
 from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger('spam_application')
@@ -36,16 +34,24 @@ class MyLogger(object):
         logger.error(msg)
 
 
-def get_links(url, window_env):
+def get_links(url, api_key,  window_env):
     try:
         # extract playlist id from url
         # url = 'https://www.youtube.com/playlist?list=PL3D7BFF1DDBDAAFE5'
         query = parse_qs(urlparse(url).query, keep_blank_values=True)
         playlist_id = query["list"][0]
 
+        # Path to the json file you downloaded:
+        path_json = 'rest.json'
+
+        with open(path_json, encoding='utf-8') as f:
+            service = json.load(f)
         print(f'get all playlist items links from {playlist_id}')
-        youtube = googleapiclient.discovery.build("youtube", "v3",
-                                                  developerKey="AIzaSyBDHutkFzJwEiSLkjy_7cMCgdWdZjaBobI")
+        # api_key = "AIzaSyBDHutkFzJwEiSLkjy_7cMCgdWdZjaBobI"
+        youtube = discovery.build_from_document(service,
+                                           developerKey=api_key)
+        # youtube = googleapiclient.discovery.build("youtube", "v3",
+        #                                           developerKey="AIzaSyBDHutkFzJwEiSLkjy_7cMCgdWdZjaBobI")
 
         request = youtube.playlistItems().list(
             part="snippet",
@@ -68,6 +74,7 @@ def get_links(url, window_env):
         window_env.write_event_value('GetLinksSuccessfully',
                                      json.dumps(table_data_tmp))  # put a message into queue for GUI
     except Exception as ex:
+        logger.error(f'get_links exception: {ex}')
         print(f'get_links exception: {ex}')
 
 

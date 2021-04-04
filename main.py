@@ -21,7 +21,7 @@ while True:
         window.Element('Get Playlist').Update(disabled=True, text='Getting Playlist...')
         processed = 0
         window.Element('table').Update(values=[])
-        x = threading.Thread(target=get_links, args=(values['input'], window,), daemon=True)
+        x = threading.Thread(target=get_links, args=(values['input'], values['input_gg_key'], window,), daemon=True)
         x.start()
     elif event == 'GetLinksSuccessfully':
         try:
@@ -79,19 +79,19 @@ while True:
             status = old_data[i][2]
             if status == 'downloading' and title in all_downloaded and processed <= len(old_data):
                 # downloaded, start new thread
+                old_data[i][2] = 'finished'
                 try:
                     num_thread = int(values['input_thread'])
                 except:
                     num_thread = 5
                 if num_downloading <= num_thread + 1:
-                    old_data[i][2] = 'finished'
                     data = old_data[processed]
                     old_data[processed][2] = 'downloading'
                     thread1 = DownloadingThread(processed, data, window)
                     thread1.start()
                     processed += 1
-                    window.Element('table').Update(values=old_data)
-                    window.refresh()
+                window.Element('table').Update(values=old_data)
+                window.refresh()
 
     elif event == 'Remove':
         removed = values['table']
